@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PinTopic — Neon Random Topic Generator</title>
+<style>
+*{box-sizing:border-box}
+:root{--cyan:#00f5ff;--pink:#ff28d7;--violet:#7c3cff}
+body{
+  margin:0;min-height:100vh;display:grid;place-items:center;overflow-x:hidden;
+  font-family:Inter,Arial,sans-serif;color:#fff;
+  background:#05030d;
+}
+body:before{
+  content:"";position:fixed;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 50% 40%,rgba(124,60,255,.25),transparent 34%),
+    radial-gradient(circle at 10% 90%,rgba(0,245,255,.12),transparent 30%),
+    radial-gradient(circle at 90% 10%,rgba(255,40,215,.12),transparent 30%);
+}
+.grid{
+  position:fixed;inset:0;opacity:.18;pointer-events:none;
+  background-image:linear-gradient(#00f5ff 1px,transparent 1px),linear-gradient(90deg,#00f5ff 1px,transparent 1px);
+  background-size:50px 50px;transform:perspective(500px) rotateX(55deg) scale(1.5);transform-origin:center bottom;
+}
+.app{width:min(94vw,760px);position:relative;z-index:2;text-align:center;padding:30px 0}
+.brand{font-size:12px;letter-spacing:6px;color:var(--cyan);text-shadow:0 0 15px var(--cyan);margin-bottom:12px}
+h1{font-size:clamp(42px,9vw,78px);margin:0;line-height:.95;letter-spacing:-4px;text-shadow:0 0 12px #fff,0 0 35px var(--pink),0 0 70px var(--pink)}
+.sub{color:#8d91b8;margin:18px auto 34px;max-width:560px;line-height:1.6}
+.dice-area{height:205px;display:grid;place-items:center}
+.dice-shell{perspective:800px}
+.dice{
+ width:145px;height:145px;border-radius:30px;display:grid;place-items:center;
+ font-size:72px;font-weight:900;
+ background:linear-gradient(145deg,rgba(0,245,255,.12),rgba(255,40,215,.15));
+ border:2px solid var(--cyan);
+ box-shadow:0 0 12px var(--cyan),0 0 42px rgba(0,245,255,.45),inset 0 0 35px rgba(255,40,215,.22);
+ transform:rotate(-8deg);
+}
+.rolling .dice{animation:roll .8s ease-in-out}
+@keyframes roll{
+  0%{transform:rotate(-8deg) scale(1)}
+  25%{transform:rotate(105deg) scale(1.12)}
+  50%{transform:rotate(205deg) scale(.9)}
+  75%{transform:rotate(300deg) scale(1.08)}
+  100%{transform:rotate(352deg) scale(1)}
+}
+.card{
+ min-height:155px;padding:28px;border:1px solid rgba(255,40,215,.5);border-radius:24px;
+ background:rgba(8,6,20,.78);box-shadow:0 0 30px rgba(255,40,215,.15),inset 0 0 30px rgba(0,245,255,.04);
+ backdrop-filter:blur(14px);
+}
+.label{font-size:11px;letter-spacing:4px;color:var(--pink);text-transform:uppercase}
+#topic{font-size:clamp(26px,5vw,44px);font-weight:850;margin:14px 0 0;text-shadow:0 0 20px rgba(0,245,255,.7)}
+#source{font-size:12px;color:#626a96;margin-top:12px}
+.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+button,.pin-link{
+ margin-top:22px;border:0;border-radius:999px;padding:15px 27px;font-weight:800;font-size:15px;
+ cursor:pointer;text-decoration:none;display:inline-block;transition:.2s
+}
+button{color:#02030a;background:linear-gradient(90deg,var(--cyan),var(--pink));box-shadow:0 0 15px var(--cyan),0 0 35px rgba(255,40,215,.45)}
+.pin-link{color:#fff;border:1px solid rgba(255,40,215,.65);background:rgba(255,40,215,.08)}
+button:hover,.pin-link:hover{transform:translateY(-3px);filter:brightness(1.12)}
+button:disabled{opacity:.5;cursor:wait;transform:none}
+.status{height:20px;margin-top:15px;color:#737ba8;font-size:13px}
+.counter{font-size:12px;color:#50577e;margin-top:8px}
+.reset{margin-top:12px;color:#555d84;font-size:11px;text-decoration:underline;cursor:pointer}
+.note{font-size:11px;color:#4e5579;margin-top:22px;line-height:1.5}
+@media(max-width:500px){.app{padding:20px 0}.dice{width:120px;height:120px;font-size:58px}.dice-area{height:175px}.card{padding:24px 17px}}
+</style>
+</head>
+<body>
+<div class="grid"></div>
+
+<main class="app">
+  <div class="brand">PINTOPIC // DISCOVERY ENGINE</div>
+  <h1>ROLL & PIN</h1>
+  <p class="sub">Discover one fresh, Pinterest-inspired topic at a time. Once a topic appears, it will never be selected again on this browser.</p>
+
+  <div class="dice-area" id="diceArea">
+    <div class="dice-shell"><div class="dice" id="dice">⚄</div></div>
+  </div>
+
+  <section class="card">
+    <div class="label">Your Random Topic</div>
+    <div id="topic">Roll the dice</div>
+    <div id="source">Pinterest-inspired discovery</div>
+  </section>
+
+  <div class="actions">
+    <button id="roll" onclick="rollTopic()">🎲 Roll for a Topic</button>
+    <a id="pinLink" class="pin-link" href="#" target="_blank" rel="noopener" style="display:none">📌 Explore on Pinterest</a>
+  </div>
+
+  <div class="status" id="status">Ready.</div>
+  <div class="counter" id="counter"></div>
+  <div class="reset" onclick="resetHistory()">Reset topic memory</div>
+  <div class="note">Topic pool is designed around Pinterest-style discovery categories and trend themes. No Pinterest login or API key is required.</div>
+</main>
+
+<script>
+/*
+  IMPORTANT:
+  A standalone browser page cannot reliably call Pinterest's private/internal
+  endpoints. This version therefore uses a large Pinterest-inspired topic pool.
+  The no-repeat history is stored in localStorage.
+*/
+
+const topics = [
+"Neo Deco","Cool Blue","Poetcore","Glitchy Glam","Mystic Outlands","Pen Pals","FunHaus","Cabbage Crush",
+"Cherry Red Aesthetic","Dark Academia","Coastal Grandmother","Cottagecore","Goblincore","Dreamy Interiors",
+"Retro Futurism","Y2K Fashion","Cyberpunk Fashion","Quiet Luxury","Streetwear Styling","Vintage Denim",
+"Monochrome Outfit","Silver Jewelry","Layered Jewelry","Statement Nails","Chrome Nails","Butterfly Makeup",
+"Soft Glam Makeup","Editorial Makeup","Colorful Eyeliner","Glass Skin","Messy Bun Hairstyles","Short Hair Ideas",
+"French Bob","Butterfly Haircut","Curly Hair Inspiration","Festival Hairstyles","Minimalist Tattoos","Fine Line Tattoos",
+"Nature Tattoos","Travel Photography","Cinematic Photography","Golden Hour Photography","Night Photography",
+"Urban Photography","Street Photography","Minimal Photography","Film Photography","Polaroid Aesthetic",
+"Moody Photography","Architecture Photography","Hidden Places","Weekend Getaways","Solo Travel Ideas",
+"Mountain Escapes","Beach Escapes","Desert Travel","Forest Cabins","Luxury Train Travel","Road Trip Ideas",
+"Sunrise Locations","Sunset Locations","Café Hopping","Hidden Cafes","Aesthetic Cafes","Coffee Art",
+"Matcha Recipes","Korean Food","Japanese Food","Indian Street Food","Comfort Food","Fusion Food",
+"Mini Desserts","Chocolate Desserts","Strawberry Desserts","Pasta Ideas","Healthy Breakfast","Mocktail Ideas",
+"Home Office Ideas","Small Bedroom Ideas","Dream Bedroom","Minimalist Home","Colorful Interiors","Dark Interiors",
+"Biophilic Design","Tiny Home Ideas","Balcony Makeover","Desk Setup","Gaming Room Setup","Reading Nook",
+"DIY Wall Decor","Gallery Wall Ideas","Lighting Ideas","Neon Room Ideas","Plant Styling","Bookshelf Styling",
+"Creative Journaling","Scrapbooking","Vision Boards","Bullet Journaling","Digital Art","3D Art",
+"Collage Art","Surreal Art","Pixel Art","Typography Art","Poster Design","Logo Design Inspiration",
+"Web Design Trends","UI Design Inspiration","App Design Ideas","Creative Coding","AI Art Concepts",
+"Motion Graphics","Video Editing Ideas","Cinematic Transitions","Short Film Ideas","Storytelling Ideas",
+"Documentary Ideas","Podcast Concepts","YouTube Video Ideas","Reel Ideas","Creative Challenges",
+"Interesting Facts","Psychology Facts","Human Behavior","Space Mysteries","Ocean Mysteries","Ancient Civilizations",
+"Future Technology","Robotics","Artificial Intelligence","Virtual Reality","Astronomy","Black Holes",
+"Unsolved Mysteries","Strange History","Lost Cities","Mythology","Folklore","Ancient Architecture",
+"Future Cities","Smart Homes","Electric Vehicles","Sustainable Design","Eco Lifestyle","Minimalist Lifestyle",
+"Productivity Systems","Study Setup","Study Motivation","Career Ideas","Business Ideas","Startup Concepts",
+"Personal Branding","Freelancing Ideas","Content Creation","Marketing Ideas","Brand Storytelling",
+"Money Mindset","Skill Building","Learning Challenges","Language Learning","Public Speaking","Leadership Ideas",
+"Fitness Motivation","Home Workout","Running Motivation","Yoga Inspiration","Meditation Spaces",
+"Morning Routine","Night Routine","Self Improvement","Confidence Building","Digital Detox","Mindful Living",
+"Creative Writing Prompts","Short Story Ideas","Poetry Inspiration","Character Design","Fantasy Worlds",
+"Science Fiction Worlds","Mystery Story Ideas","Romantic Story Ideas","Adventure Story Ideas",
+"Book Recommendations","Movie Aesthetics","Film Photography Styles","Album Cover Design","Music Discovery",
+"Concert Photography","Dance Photography","Dance Outfit Ideas","Festival Aesthetic","Party Decoration Ideas",
+"Birthday Theme Ideas","Wedding Decor","Wedding Photography","Gift Ideas","Handmade Gifts","DIY Crafts",
+"Resin Art","Clay Art","Candle Making","Soap Making","Flower Arrangements","Pressed Flowers",
+"Thrift Flip Ideas","Upcycling Ideas","Vintage Finds","Collectibles","Retro Gadgets","Cool Gadgets",
+"Desk Gadgets","Travel Gadgets","Photography Gadgets","Creator Gear","Minimal Tech Setup"
+];
+
+const KEY="pinTopicNeverRepeat_v2";
+let used=new Set(JSON.parse(localStorage.getItem(KEY)||"[]"));
+
+const topic=document.getElementById("topic");
+const status=document.getElementById("status");
+const counter=document.getElementById("counter");
+const roll=document.getElementById("roll");
+const dice=document.getElementById("dice");
+const area=document.getElementById("diceArea");
+const pinLink=document.getElementById("pinLink");
+
+function updateCounter(){
+  counter.textContent=`${used.size} unique topic${used.size===1?"":"s"} already used`;
+}
+function save(){localStorage.setItem(KEY,JSON.stringify([...used]));updateCounter();}
+function key(t){return t.toLowerCase().trim();}
+
+function randomUnused(){
+  const available=topics.filter(t=>!used.has(key(t)));
+  if(!available.length)return null;
+  return available[Math.floor(Math.random()*available.length)];
+}
+
+function rollTopic(){
+  roll.disabled=true;
+  area.classList.remove("rolling"); void area.offsetWidth; area.classList.add("rolling");
+  dice.textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][Math.floor(Math.random()*6)];
+  topic.textContent="Finding something fresh…";
+  status.textContent="Scanning the discovery pool…";
+  pinLink.style.display="none";
+
+  setTimeout(()=>{
+    const picked=randomUnused();
+
+    if(!picked){
+      topic.textContent="Topic pool exhausted";
+      status.textContent="Every topic in this built-in pool has already been used.";
+      roll.disabled=false;
+      return;
+    }
+
+    used.add(key(picked));
+    save();
+    topic.textContent=picked;
+    status.textContent="Fresh topic selected — it will not appear again.";
+    pinLink.href="https://www.pinterest.com/search/pins/?q="+encodeURIComponent(picked);
+    pinLink.style.display="inline-block";
+    roll.disabled=false;
+  },750);
+}
+
+function resetHistory(){
+  if(confirm("Erase the no-repeat history? Previously used topics may appear again.")){
+    used.clear();
+    localStorage.removeItem(KEY);
+    topic.textContent="Roll the dice";
+    status.textContent="Topic memory reset.";
+    pinLink.style.display="none";
+    updateCounter();
+  }
+}
+updateCounter();
+</script>
+</body>
+</html>
